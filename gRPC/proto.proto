@@ -1,8 +1,28 @@
 syntax = "proto3";
 option go_package = "ProjectDS/grpc/proto";
 
-message Students {
-  repeated string students = 1;
+message joinRequest {
+  string client_id  = 1;
+}
+
+message publishRequest {
+  string client_id = 1;
+  string content = 2;
+}
+
+message leaveRequest {
+  string client_id = 1;
+}
+
+message chatMessage {
+  string from = 1;
+  string content = 2;
+  int64 logical_time = 3;
+}
+
+message ack {
+  bool success = 1;
+  string error = 2;
 }
 
 message empty {
@@ -10,5 +30,10 @@ message empty {
 }
 
 service ITUdatabase {
-  rpc GetStudents (empty) returns (Students) {};
+
+  rpc Join(joinRequest) returns (stream chatMessage);
+
+  rpc Publish(publishRequest) returns (ack);
+
+  rpc Leave(leaveRequest) returns (ack);
 }
