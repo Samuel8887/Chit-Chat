@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -23,6 +24,7 @@ func main() {
 	reader := bufio.NewReader(os.Stdin)
 	logicalTime := 0
 
+	joined := false
 	for {
 		fmt.Print("> ")
 		input, err := reader.ReadString('\n')
@@ -30,29 +32,55 @@ func main() {
 			log.Fatalf("input went wrong %v", err)
 		}
 		input = strings.TrimSpace(input)
-		if input == "joinP1" {
-			joinRequest, _ := client.Join(context.Background(), &proto.JoinRequest{
-				ClientId: "P1", LogicalTime: int64(logicalTime + 1),
-			})
-			log.Printf("joining: %v", joinRequest)
+		if input == "joinP2" {
+			if !joined {
+				stream, err := client.Join(context.Background(), &proto.JoinRequest{
+					ClientId: "P2", LogicalTime: int64(logicalTime + 1),
+				})
+				if err != nil {
+					log.Fatalf("could not join: %v", err)
+				}
+				log.Printf("Joined chat")
+				joined = true
+
+				go func() {
+					for {
+						msg, err := stream.Recv()
+						if err == io.EOF {
+							log.Println("Stream closed")
+							break
+						}
+						if err != nil {
+							log.Fatalf("recv error: %v", err)
+						}
+						log.Printf("received: %v", msg)
+					}
+				}()
+			} else {
+				log.Printf("Already joined!")
+			}
 		}
 
-		if input == "publishP1" {
+		if input == "publishP2" {
+			if !joined {
+				log.Println("You are not in the chat!")
+				continue
+			}
 			publishRequest, _ := client.Publish(context.Background(), &proto.PublishRequest{
-				ClientId: "P1", LogicalTime: int64(logicalTime + 1), Content: input,
+				ClientId: "P2", LogicalTime: int64(logicalTime + 1), Content: input,
 			})
 			log.Printf("Publishing: %v", publishRequest)
 		}
-		if input == "leaveP1" {
+		if input == "leaveP2" {
+			if !joined {
+				log.Println("You are not in the chat!")
+				continue
+			}
 			leaveRequest, _ := client.Leave(context.Background(), &proto.LeaveRequest{
-				ClientId: "P1", LogicalTime: int64(logicalTime + 1),
+				ClientId: "P2", LogicalTime: int64(logicalTime + 1),
 			})
 			log.Printf("Leaving: %v", leaveRequest)
+			joined = false
 		}
 	}
-	/*students, err := client.GetStudents(context.Background(), &proto.Empty{})
-
-	for _, student := range students.Students {
-		log.Printf("Student: %v", student)
-	}*/
 }

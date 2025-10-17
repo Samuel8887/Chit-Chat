@@ -24,7 +24,6 @@ func main() {
 	reader := bufio.NewReader(os.Stdin)
 	logicalTime := 0
 
-	var stream proto.Chit_Chat_JoinClient // server stream handle
 	joined := false
 	for {
 		fmt.Print("> ")
@@ -35,21 +34,24 @@ func main() {
 		input = strings.TrimSpace(input)
 		if input == "joinP1" {
 			if !joined {
-				joinRequest, _ := client.Join(context.Background(), &proto.JoinRequest{
+				stream, err := client.Join(context.Background(), &proto.JoinRequest{
 					ClientId: "P1", LogicalTime: int64(logicalTime + 1),
 				})
-				log.Printf("joining: %v", joinRequest)
+				if err != nil {
+					log.Fatalf("could not join: %v", err)
+				}
+				log.Printf("Joined chat")
 				joined = true
 
 				go func() {
 					for {
 						msg, err := stream.Recv()
-						if err != nil {
-							log.Fatalf("could not recieve: %v", err)
-						}
 						if err == io.EOF {
 							log.Println("Stream closed")
 							break
+						}
+						if err != nil {
+							log.Fatalf("recv error: %v", err)
 						}
 						log.Printf("received: %v", msg)
 					}
@@ -57,7 +59,6 @@ func main() {
 			} else {
 				log.Printf("Already joined!")
 			}
-
 		}
 
 		if input == "publishP1" {
