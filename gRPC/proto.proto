@@ -3,15 +3,18 @@ option go_package = "ProjectDS/grpc/proto";
 
 message joinRequest {
   string client_id  = 1;
+  int64 logical_time = 3;
 }
 
 message publishRequest {
   string client_id = 1;
   string content = 2;
+  int64 logical_time = 3;
 }
 
 message leaveRequest {
   string client_id = 1;
+  int64 logical_time = 3;
 }
 
 message chatMessage {
@@ -25,11 +28,11 @@ message ack {
   string error = 2;
 }
 
-message empty {
+message Empty {
 
 }
 
-service ITUdatabase {
+service Chit_Chat {
 
   rpc Join(joinRequest) returns (stream chatMessage);
 

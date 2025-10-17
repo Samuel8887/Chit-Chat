@@ -1,7 +1,7 @@
 package main
 
 import (
-	proto "ITUserver/gRPC"
+	proto "Chit_Chat/gRPC"
 	"context"
 	"google.golang.org/grpc"
 	"log"
