@@ -32,7 +32,13 @@ func main() {
 			log.Fatalf("input went wrong %v", err)
 		}
 		input = strings.TrimSpace(input)
-		if input == "joinP2" {
+		parts := strings.SplitN(input, " ", 2)
+		command := parts[0]
+		message := ""
+		if len(parts) > 1 {
+			message = parts[1]
+		}
+		if command == "joinP2" {
 			if !joined {
 				stream, err := client.Join(context.Background(), &proto.JoinRequest{
 					ClientId: "P2", LogicalTime: int64(logicalTime + 1),
@@ -61,17 +67,17 @@ func main() {
 			}
 		}
 
-		if input == "publishP2" {
+		if command == "publishP2" {
 			if !joined {
 				log.Println("You are not in the chat!")
 				continue
 			}
 			publishRequest, _ := client.Publish(context.Background(), &proto.PublishRequest{
-				ClientId: "P2", LogicalTime: int64(logicalTime + 1), Content: input,
+				ClientId: "P2", LogicalTime: int64(logicalTime + 1), Content: message,
 			})
 			log.Printf("Publishing: %v", publishRequest)
 		}
-		if input == "leaveP2" {
+		if command == "leaveP2" {
 			if !joined {
 				log.Println("You are not in the chat!")
 				continue
