@@ -1,5 +1,5 @@
 syntax = "proto3";
-option go_package = "ProjectDS/grpc/proto";
+option go_package = "Chit_Chat/grpc/proto";
 
 message joinRequest {
   string client_id  = 1;
@@ -29,7 +29,7 @@ message empty {
 
 }
 
-service ITUdatabase {
+service Chit_Chat {
 
   rpc Join(joinRequest) returns (stream chatMessage);
 
