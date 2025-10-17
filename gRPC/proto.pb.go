@@ -188,7 +188,7 @@ func (x *LeaveRequest) GetLogicalTime() int64 {
 type ChatMessage struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	From          string                 `protobuf:"bytes,1,opt,name=from,proto3" json:"from,omitempty"`
-	Content       string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	LogicalTime   int64                  `protobuf:"varint,3,opt,name=logical_time,json=logicalTime,proto3" json:"logical_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -231,9 +231,9 @@ func (x *ChatMessage) GetFrom() string {
 	return ""
 }
 
-func (x *ChatMessage) GetContent() string {
+func (x *ChatMessage) GetMessage() string {
 	if x != nil {
-		return x.Content
+		return x.Message
 	}
 	return ""
 }
@@ -358,7 +358,7 @@ const file_proto_proto_rawDesc = "" +
 	"\flogical_time\x18\x02 \x01(\x03R\vlogicalTime\"^\n" +
 	"\vchatMessage\x12\x12\n" +
 	"\x04from\x18\x01 \x01(\tR\x04from\x12\x18\n" +
-	"\acontent\x18\x02 \x01(\tR\acontent\x12!\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12!\n" +
 	"\flogical_time\x18\x03 \x01(\x03R\vlogicalTime\"X\n" +
 	"\x03ack\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +

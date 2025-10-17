@@ -3,6 +3,7 @@ package main
 import (
 	proto "Chit_Chat/gRPC"
 	"context"
+	"fmt"
 	"google.golang.org/grpc"
 	"log"
 	"net"
@@ -50,17 +51,31 @@ func (s *Server) StopServer() {
 	}
 }
 
-func (s *Server) Join(req *proto.JoinRequest, stream proto.Chit_Chat_JoinServer) error {
-	log.Printf("[%s] User %s joined", time.Now().Format(time.RFC3339), req.ClientId)
+func (s *Server) broadcast(msg *proto.ChatMessage, excludeID string) {
+	s.clientsMu.Lock()
+	defer s.clientsMu.Unlock()
 
+	for i := 0; i < len(s.clients); i++ {
+		c := s.clients[i]
+
+		if err := c.stream.Send(msg); err != nil {
+			log.Printf(" failed to send to %s: %v", c.id, err)
+
+			s.clients = append(s.clients[:i], s.clients[i+1:]...)
+			i--
+		}
+	}
+}
+
+func (s *Server) Join(req *proto.JoinRequest, stream proto.Chit_Chat_JoinServer) error {
 	s.clientsMu.Lock()
 	s.clients = append(s.clients, client{id: req.ClientId, stream: stream})
 	s.clientsMu.Unlock()
 
-	stream.Send(&proto.ChatMessage{
+	s.broadcast(&proto.ChatMessage{
 		From:    "server",
-		Content: "Welcome " + req.ClientId + "!",
-	})
+		Message: fmt.Sprintf("%s has joined the chat!", req.ClientId),
+	}, req.ClientId)
 
 	select {}
 }
@@ -71,7 +86,7 @@ func (s *Server) Publish(ctx context.Context, req *proto.PublishRequest) (*proto
 
 	msg := &proto.ChatMessage{
 		From:    req.ClientId,
-		Content: req.Content,
+		Message: req.Content,
 	}
 
 	for i := 0; i < len(s.clients); i++ {
@@ -87,15 +102,22 @@ func (s *Server) Publish(ctx context.Context, req *proto.PublishRequest) (*proto
 
 func (s *Server) Leave(ctx context.Context, req *proto.LeaveRequest) (*proto.Ack, error) {
 	s.clientsMu.Lock()
-	defer s.clientsMu.Unlock()
-
+	var idx int = -1
 	for i, c := range s.clients {
 		if c.id == req.ClientId {
-			s.clients = append(s.clients[:i], s.clients[i+1:]...)
-			log.Printf("[%s] User %s left", time.Now().Format(time.RFC3339), req.ClientId)
+			idx = i
 			break
 		}
 	}
+	if idx != -1 {
+		s.clients = append(s.clients[:idx], s.clients[idx+1:]...)
+	}
+	s.clientsMu.Unlock()
+
+	s.broadcast(&proto.ChatMessage{
+		From:    "server",
+		Message: fmt.Sprintf("%s has left the chat", req.ClientId),
+	}, req.ClientId)
 
 	return &proto.Ack{Success: true}, nil
 }

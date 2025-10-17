@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure" // for security
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
@@ -32,7 +32,13 @@ func main() {
 			log.Fatalf("input went wrong %v", err)
 		}
 		input = strings.TrimSpace(input)
-		if input == "joinP3" {
+		parts := strings.SplitN(input, " ", 2)
+		command := parts[0]
+		message := ""
+		if len(parts) > 1 {
+			message = parts[1]
+		}
+		if command == "joinP3" {
 			if !joined {
 				stream, err := client.Join(context.Background(), &proto.JoinRequest{
 					ClientId: "P3", LogicalTime: int64(logicalTime + 1),
@@ -40,7 +46,7 @@ func main() {
 				if err != nil {
 					log.Fatalf("could not join: %v", err)
 				}
-				log.Printf("Joined chat")
+
 				joined = true
 
 				go func() {
@@ -61,25 +67,25 @@ func main() {
 			}
 		}
 
-		if input == "publishP3" {
+		if command == "publishP3" {
 			if !joined {
 				log.Println("You are not in the chat!")
 				continue
 			}
-			publishRequest, _ := client.Publish(context.Background(), &proto.PublishRequest{
-				ClientId: "P3", LogicalTime: int64(logicalTime + 1), Content: input,
+			_, _ = client.Publish(context.Background(), &proto.PublishRequest{
+				ClientId: "P3", LogicalTime: int64(logicalTime + 1), Content: message,
 			})
-			log.Printf("Publishing: %v", publishRequest)
+			//log.Printf("Publishing: %v", publishRequest)
 		}
-		if input == "leaveP3" {
+		if command == "leaveP3" {
 			if !joined {
 				log.Println("You are not in the chat!")
 				continue
 			}
-			leaveRequest, _ := client.Leave(context.Background(), &proto.LeaveRequest{
+			_, _ = client.Leave(context.Background(), &proto.LeaveRequest{
 				ClientId: "P3", LogicalTime: int64(logicalTime + 1),
 			})
-			log.Printf("Leaving: %v", leaveRequest)
+			//log.Printf("Leaving: %v", leaveRequest)
 			joined = false
 		}
 	}
