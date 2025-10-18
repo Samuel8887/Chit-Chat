@@ -57,7 +57,7 @@ func main() {
 							break
 						}
 						if err != nil {
-							log.Fatalf("recv error: %v", err)
+							log.Fatalf("Server connection lost")
 						}
 						log.Printf("received: %v", msg)
 					}
