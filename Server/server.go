@@ -4,11 +4,15 @@ import (
 	proto "Chit_Chat/gRPC"
 	"context"
 	"fmt"
-	"google.golang.org/grpc"
 	"log"
 	"net"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
+
+	"google.golang.org/grpc"
 )
 
 type client struct {
@@ -35,20 +39,25 @@ func (s *Server) StartServer() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	log.Printf("[%s] Server starting on :8000", time.Now().Format(time.RFC3339))
 	s.grpcServer = grpc.NewServer()
 	proto.RegisterChit_ChatServer(s.grpcServer, s)
 
-	if err := s.grpcServer.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
-	}
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		log.Printf("[%s] Server starting on :8000", time.Now().Format(time.RFC3339))
+		if err := s.grpcServer.Serve(lis); err != nil {
+			log.Fatalf("failed to serve: %v", err)
+		}
+	}()
+	<-stop
+	s.StopServer()
 }
 
 func (s *Server) StopServer() {
-	if s.grpcServer != nil {
-		log.Printf("[%s] Server stopping on :8000", time.Now().Format(time.RFC3339))
-		s.grpcServer.Stop()
-	}
+	s.grpcServer.GracefulStop()
+	log.Println("Server stopped.")
 }
 
 func (s *Server) broadcast(msg *proto.ChatMessage, excludeID string) {
