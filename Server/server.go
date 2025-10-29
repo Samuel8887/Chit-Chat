@@ -26,6 +26,16 @@ type Server struct {
 
 	clients   []client
 	clientsMu sync.Mutex
+
+	lTime int64
+}
+
+func (s *Server) tickSeen(remote int64) int64 {
+	if remote > s.lTime {
+		s.lTime = remote
+	}
+	s.lTime++
+	return s.lTime
 }
 
 func main() {
@@ -66,7 +76,9 @@ func (s *Server) broadcast(msg *proto.ChatMessage, excludeID string) {
 
 	for i := 0; i < len(s.clients); i++ {
 		c := s.clients[i]
-
+		if c.id == excludeID {
+			continue
+		}
 		if err := c.stream.Send(msg); err != nil {
 			log.Printf(" failed to send to %s: %v", c.id, err)
 
@@ -81,9 +93,15 @@ func (s *Server) Join(req *proto.JoinRequest, stream proto.Chit_Chat_JoinServer)
 	s.clients = append(s.clients, client{id: req.ClientId, stream: stream})
 	s.clientsMu.Unlock()
 
+	if req.LogicalTime > s.lTime {
+		s.lTime = req.LogicalTime
+	}
+	s.lTime++
+
 	s.broadcast(&proto.ChatMessage{
-		From:    "server",
-		Message: fmt.Sprintf("%s has joined the chat!", req.ClientId),
+		From:        "server",
+		Message:     fmt.Sprintf("%s has joined the chat!", req.ClientId),
+		LogicalTime: s.lTime,
 	}, req.ClientId)
 
 	select {}
@@ -93,12 +111,21 @@ func (s *Server) Publish(ctx context.Context, req *proto.PublishRequest) (*proto
 	s.clientsMu.Lock()
 	defer s.clientsMu.Unlock()
 
+	if req.LogicalTime > s.lTime {
+		s.lTime = req.LogicalTime
+	}
+	s.lTime++
+
 	msg := &proto.ChatMessage{
-		From:    req.ClientId,
-		Message: req.Content,
+		From:        req.ClientId,
+		Message:     req.Content,
+		LogicalTime: s.lTime,
 	}
 
 	for i := 0; i < len(s.clients); i++ {
+		if s.clients[i].id == req.ClientId {
+			continue
+		}
 		if err := s.clients[i].stream.Send(msg); err != nil {
 			log.Printf("failed to send to %s: %v", s.clients[i].id, err)
 			s.clients = append(s.clients[:i], s.clients[i+1:]...)
@@ -106,7 +133,7 @@ func (s *Server) Publish(ctx context.Context, req *proto.PublishRequest) (*proto
 		}
 	}
 
-	return &proto.Ack{Success: true}, nil
+	return &proto.Ack{Success: true, LogicalTime: s.lTime}, nil
 }
 
 func (s *Server) Leave(ctx context.Context, req *proto.LeaveRequest) (*proto.Ack, error) {
@@ -123,10 +150,16 @@ func (s *Server) Leave(ctx context.Context, req *proto.LeaveRequest) (*proto.Ack
 	}
 	s.clientsMu.Unlock()
 
+	if req.LogicalTime > s.lTime {
+		s.lTime = req.LogicalTime
+	}
+	s.lTime++
+
 	s.broadcast(&proto.ChatMessage{
-		From:    "server",
-		Message: fmt.Sprintf("%s has left the chat", req.ClientId),
+		From:        "server",
+		Message:     fmt.Sprintf("%s has left the chat", req.ClientId),
+		LogicalTime: s.lTime,
 	}, req.ClientId)
 
-	return &proto.Ack{Success: true}, nil
+	return &proto.Ack{Success: true, LogicalTime: s.lTime}, nil
 }
