@@ -41,7 +41,7 @@ func main() {
 		if command == "joinP1" {
 			if !joined {
 				stream, err := client.Join(context.Background(), &proto.JoinRequest{
-					ClientId: "P1", LogicalTime: int64(logicalTime + 1),
+					ClientId: "P1", LogicalTime: int64(logicalTime),
 				})
 				if err != nil {
 					log.Fatalf("could not join: %v", err)
@@ -50,6 +50,15 @@ func main() {
 				joined = true
 
 				go func() {
+					f, err := os.OpenFile("P1.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+					if err != nil {
+						log.Printf("could not open log file: %v", err)
+					}
+					defer func() {
+						if f != nil {
+							_ = f.Close()
+						}
+					}()
 					for {
 						msg, err := stream.Recv()
 						if err == io.EOF {
@@ -58,6 +67,13 @@ func main() {
 						}
 						if err != nil {
 							log.Fatalf("Server connection lost")
+						}
+						if int64(logicalTime) < msg.LogicalTime {
+							logicalTime = int(msg.LogicalTime)
+						}
+						fmt.Printf("[L=%d] %s\n", msg.LogicalTime, msg.Message)
+						if f != nil {
+							_, _ = fmt.Fprintf(f, "%d\t%s\n", msg.LogicalTime, msg.Message)
 						}
 						log.Printf("received: %v", msg)
 					}
@@ -72,8 +88,9 @@ func main() {
 				log.Println("You are not in the chat!")
 				continue
 			}
+
 			_, _ = client.Publish(context.Background(), &proto.PublishRequest{
-				ClientId: "P1", LogicalTime: int64(logicalTime + 1), Content: message,
+				ClientId: "P1", LogicalTime: int64(logicalTime), Content: message,
 			})
 			//log.Printf("Publishing: %v", publishRequest)
 		}
@@ -83,7 +100,7 @@ func main() {
 				continue
 			}
 			_, _ = client.Leave(context.Background(), &proto.LeaveRequest{
-				ClientId: "P1", LogicalTime: int64(logicalTime + 1),
+				ClientId: "P1", LogicalTime: int64(logicalTime),
 			})
 			//log.Printf("Leaving: %v", leaveRequest)
 			joined = false
