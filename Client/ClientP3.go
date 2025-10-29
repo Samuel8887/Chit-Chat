@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"unicode/utf8"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -50,15 +51,6 @@ func main() {
 				joined = true
 
 				go func() {
-					f, err := os.OpenFile("P1.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-					if err != nil {
-						log.Printf("could not open log file: %v", err)
-					}
-					defer func() {
-						if f != nil {
-							_ = f.Close()
-						}
-					}()
 					for {
 						msg, err := stream.Recv()
 						if err == io.EOF {
@@ -68,13 +60,6 @@ func main() {
 						if err != nil {
 							log.Fatalf("Server connection lost")
 						}
-						if int64(logicalTime) < msg.LogicalTime {
-							logicalTime = int(msg.LogicalTime)
-						}
-						fmt.Printf("[L=%d] %s\n", msg.LogicalTime, msg.Message)
-						if f != nil {
-							_, _ = fmt.Fprintf(f, "%d\t%s\n", msg.LogicalTime, msg.Message)
-						}
 						log.Printf("received: %v", msg)
 					}
 				}()
@@ -82,12 +67,16 @@ func main() {
 				log.Printf("Already joined!")
 			}
 		}
-
 		if command == "publishP3" {
 			if !joined {
 				log.Println("You are not in the chat!")
 				continue
 			}
+			if utf8.RuneCountInString(message) > 128 {
+				log.Println("Message is too long, max 128 characters")
+				continue
+			}
+
 			_, _ = client.Publish(context.Background(), &proto.PublishRequest{
 				ClientId: "P3", LogicalTime: int64(logicalTime), Content: message,
 			})
@@ -103,6 +92,10 @@ func main() {
 			})
 			//log.Printf("Leaving: %v", leaveRequest)
 			joined = false
+		}
+		if command == "terminateP3" {
+			log.Println("Terminating client")
+			break
 		}
 	}
 }

@@ -66,24 +66,35 @@ func (s *Server) StartServer() {
 }
 
 func (s *Server) StopServer() {
-	s.grpcServer.GracefulStop()
-	log.Println("Server stopped.")
+	s.grpcServer.Stop()
+	log.Println("Server stopped")
 }
 
 func (s *Server) broadcast(msg *proto.ChatMessage, excludeID string) {
 	s.clientsMu.Lock()
-	defer s.clientsMu.Unlock()
-
-	for i := 0; i < len(s.clients); i++ {
-		c := s.clients[i]
+	clientsCopy := make([]client, len(s.clients))
+	copy(clientsCopy, s.clients)
+	s.clientsMu.Unlock()
+	for _, c := range clientsCopy {
 		if c.id == excludeID {
 			continue
 		}
-		if err := c.stream.Send(msg); err != nil {
-			log.Printf(" failed to send to %s: %v", c.id, err)
+		go func(c client) {
+			if err := c.stream.Send(msg); err != nil {
+				log.Printf("Failed to send to %s: %v", c.id, err)
+				s.removeClient(c.id)
+			}
+		}(c)
+	}
+}
 
+func (s *Server) removeClient(id string) {
+	s.clientsMu.Lock()
+	defer s.clientsMu.Unlock()
+	for i, c := range s.clients {
+		if c.id == id {
 			s.clients = append(s.clients[:i], s.clients[i+1:]...)
-			i--
+			break
 		}
 	}
 }
