@@ -26,16 +26,7 @@ type Server struct {
 
 	clients   []client
 	clientsMu sync.Mutex
-
-	lTime int64
-}
-
-func (s *Server) tickSeen(remote int64) int64 {
-	if remote > s.lTime {
-		s.lTime = remote
-	}
-	s.lTime++
-	return s.lTime
+	lTime int64 
 }
 
 func main() {
@@ -48,6 +39,8 @@ func (s *Server) StartServer() {
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
+
+	s.lTime = 0
 
 	s.grpcServer = grpc.NewServer()
 	proto.RegisterChit_ChatServer(s.grpcServer, s)
@@ -104,17 +97,19 @@ func (s *Server) Join(req *proto.JoinRequest, stream proto.Chit_Chat_JoinServer)
 	s.clients = append(s.clients, client{id: req.ClientId, stream: stream})
 	s.clientsMu.Unlock()
 
-	if req.LogicalTime > s.lTime {
-		s.lTime = req.LogicalTime
-	}
-	s.lTime++
+		s.lTime = max(s.lTime, req.LogicalTime) + 1
+	log.Printf("logical time updated to: %d", s.lTime)
+
+
 
 	s.broadcast(&proto.ChatMessage{
 		From:        "server",
 		Message:     fmt.Sprintf("%s has joined the chat!", req.ClientId),
-		LogicalTime: s.lTime,
+		LogicalTime: s.lTime + 1,
 	}, req.ClientId)
 
+	s.lTime++
+	log.Printf("logical time updated to: %d", s.lTime)
 	select {}
 }
 
@@ -122,16 +117,21 @@ func (s *Server) Publish(ctx context.Context, req *proto.PublishRequest) (*proto
 	s.clientsMu.Lock()
 	defer s.clientsMu.Unlock()
 
-	if req.LogicalTime > s.lTime {
-		s.lTime = req.LogicalTime
-	}
-	s.lTime++
+
+	s.lTime = max(s.lTime, req.LogicalTime) + 1
+	log.Printf("logical time updated to: %d", s.lTime)
+
 
 	msg := &proto.ChatMessage{
 		From:        req.ClientId,
 		Message:     req.Content,
-		LogicalTime: s.lTime,
+		LogicalTime: s.lTime + 1,
 	}
+	s.lTime++
+
+	log.Printf("logical time updated to: %d", s.lTime)
+
+
 
 	for i := 0; i < len(s.clients); i++ {
 		if s.clients[i].id == req.ClientId {
@@ -161,16 +161,18 @@ func (s *Server) Leave(ctx context.Context, req *proto.LeaveRequest) (*proto.Ack
 	}
 	s.clientsMu.Unlock()
 
-	if req.LogicalTime > s.lTime {
-		s.lTime = req.LogicalTime
-	}
-	s.lTime++
+	s.lTime = max(s.lTime, req.LogicalTime) + 1
+	log.Printf("logical time updated to: %d", s.lTime)
 
 	s.broadcast(&proto.ChatMessage{
 		From:        "server",
 		Message:     fmt.Sprintf("%s has left the chat", req.ClientId),
-		LogicalTime: s.lTime,
+		LogicalTime: s.lTime + 1,
 	}, req.ClientId)
+
+	s.lTime++
+
+	log.Printf("logical time updated to: %d", s.lTime)
 
 	return &proto.Ack{Success: true, LogicalTime: s.lTime}, nil
 }

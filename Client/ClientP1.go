@@ -22,7 +22,10 @@ func main() {
 
 	client := proto.NewChit_ChatClient(conn)
 	reader := bufio.NewReader(os.Stdin)
-	logicalTime := 0
+	var logicalTime int64
+	logicalTime = 0
+
+	var n int64;
 
 	joined := false
 	for {
@@ -40,15 +43,20 @@ func main() {
 		}
 		if command == "joinP1" {
 			if !joined {
+				logicalTime++
+
 				stream, err := client.Join(context.Background(), &proto.JoinRequest{
-					ClientId: "P1", LogicalTime: int64(logicalTime + 1),
+					ClientId: "P1", LogicalTime: int64(logicalTime),
 				})
 				if err != nil {
 					log.Fatalf("could not join: %v", err)
 				}
 
 				joined = true
+				
+				log.Printf("time: %d\n",logicalTime)
 
+				
 				go func() {
 					for {
 						msg, err := stream.Recv()
@@ -59,7 +67,16 @@ func main() {
 						if err != nil {
 							log.Fatalf("Server connection lost")
 						}
-						log.Printf("received: %v", msg)
+					
+						n = msg.LogicalTime
+
+						if(n > logicalTime){
+							logicalTime = n
+						}
+
+						log.Printf("recieved: %s client: %s with time: %d", msg.Message, msg.From, logicalTime)
+
+						//log.Printf("received: %v", msg)
 					}
 				}()
 			} else {
@@ -72,9 +89,19 @@ func main() {
 				log.Println("You are not in the chat!")
 				continue
 			}
-			_, _ = client.Publish(context.Background(), &proto.PublishRequest{
+			stream, _ := client.Publish(context.Background(), &proto.PublishRequest{
 				ClientId: "P1", LogicalTime: int64(logicalTime + 1), Content: message,
 			})
+			
+
+			n = stream.LogicalTime
+
+			if(n > logicalTime){
+				logicalTime = n
+			}
+
+			log.Printf("time: %d\n", logicalTime)
+
 			//log.Printf("Publishing: %v", publishRequest)
 		}
 		if command == "leaveP1" {
@@ -82,11 +109,19 @@ func main() {
 				log.Println("You are not in the chat!")
 				continue
 			}
-			_, _ = client.Leave(context.Background(), &proto.LeaveRequest{
+			stream, _ := client.Leave(context.Background(), &proto.LeaveRequest{
 				ClientId: "P1", LogicalTime: int64(logicalTime + 1),
 			})
 			//log.Printf("Leaving: %v", leaveRequest)
 			joined = false
+
+			n = stream.LogicalTime
+
+			if(n > logicalTime){
+				logicalTime = n
+			}
+			
+			log.Printf("time: %d\n",logicalTime)
 		}
 	}
 }

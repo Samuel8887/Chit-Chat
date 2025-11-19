@@ -23,7 +23,10 @@ func main() {
 
 	client := proto.NewChit_ChatClient(conn)
 	reader := bufio.NewReader(os.Stdin)
-	logicalTime := 0
+	var logicalTime int64
+	logicalTime = 0
+						var n int64;
+
 
 	joined := false
 	for {
@@ -41,6 +44,8 @@ func main() {
 		}
 		if command == "joinP3" {
 			if !joined {
+				logicalTime++
+
 				stream, err := client.Join(context.Background(), &proto.JoinRequest{
 					ClientId: "P3", LogicalTime: int64(logicalTime),
 				})
@@ -49,6 +54,9 @@ func main() {
 				}
 
 				joined = true
+
+				log.Printf("time: %d\n",logicalTime)
+				
 
 				go func() {
 					for {
@@ -60,7 +68,15 @@ func main() {
 						if err != nil {
 							log.Fatalf("Server connection lost")
 						}
-						log.Printf("received: %v", msg)
+
+						n = msg.LogicalTime
+
+						logicalTime = max(n, logicalTime) + 1
+
+						log.Printf("recieved: %s client: %s with time: %d", msg.Message, msg.From, logicalTime)
+
+						//log.Printf("received: %v", msg)
+
 					}
 				}()
 			} else {
@@ -76,21 +92,35 @@ func main() {
 				log.Println("Message is too long, max 128 characters")
 				continue
 			}
+		
 
-			_, _ = client.Publish(context.Background(), &proto.PublishRequest{
-				ClientId: "P3", LogicalTime: int64(logicalTime), Content: message,
+			stream, _ := client.Publish(context.Background(), &proto.PublishRequest{
+				ClientId: "P3", LogicalTime: int64(logicalTime + 1), Content: message,
 			})
 			//log.Printf("Publishing: %v", publishRequest)
+
+			n = stream.LogicalTime
+
+			logicalTime = max(n, logicalTime) + 1
+
+			log.Printf("time: %d\n", logicalTime)
 		}
 		if command == "leaveP3" {
 			if !joined {
 				log.Println("You are not in the chat!")
 				continue
 			}
-			_, _ = client.Leave(context.Background(), &proto.LeaveRequest{
-				ClientId: "P3", LogicalTime: int64(logicalTime),
+			
+			stream, _ := client.Leave(context.Background(), &proto.LeaveRequest{
+				ClientId: "P3", LogicalTime: int64(logicalTime + 1),
 			})
-			//log.Printf("Leaving: %v", leaveRequest)
+			joined = false
+
+			n = stream.LogicalTime
+
+			logicalTime = max(n, logicalTime) + 1
+			
+			log.Printf("time: %d\n",logicalTime)
 			joined = false
 		}
 		if command == "terminateP3" {
